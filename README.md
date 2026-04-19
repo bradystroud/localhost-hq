@@ -68,7 +68,7 @@ Sources/LocalhostHQ/
 
 ## Roadmap
 
-- Persistent labels ("3000 → rove-manufacturing-board")
+- Persistent labels per port ("3000 → my-next-app")
 - Auto-detect the project directory from the process `cwd`
 - Launch at login via `SMAppService`
 - A proper `.app` bundle with icon + notarization
