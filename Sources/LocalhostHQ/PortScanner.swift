@@ -43,7 +43,9 @@ final class PortScanner: ObservableObject {
     nonisolated static func runLsof() -> [ListeningPort] {
         let task = Process()
         task.launchPath = "/usr/sbin/lsof"
-        task.arguments = ["-iTCP", "-sTCP:LISTEN", "-P", "-n"]
+        // -F pcPn  → parseable output with pid/command/protocol/name fields
+        // +c 0     → disable command-name truncation
+        task.arguments = ["-iTCP", "-sTCP:LISTEN", "-P", "-n", "+c", "0", "-F", "pcPn"]
 
         let pipe = Pipe()
         task.standardOutput = pipe
@@ -56,29 +58,38 @@ final class PortScanner: ObservableObject {
         guard let output = String(data: data, encoding: .utf8) else { return [] }
 
         var results: [ListeningPort] = []
-        let lines = output.split(separator: "\n", omittingEmptySubsequences: true)
+        var currentPid: Int32 = 0
+        var currentCommand = ""
+        var currentProto = ""
 
-        for line in lines.dropFirst() { // skip header row
-            let fields = line.split(separator: " ", omittingEmptySubsequences: true)
-            guard fields.count >= 9 else { continue }
-
-            let command = String(fields[0])
-            let pid = Int32(fields[1]) ?? 0
-            let protoName = String(fields[7])
-            let name = String(fields[8])
-
-            let cleaned = name
-                .replacingOccurrences(of: "[", with: "")
-                .replacingOccurrences(of: "]", with: "")
-            guard let portStr = cleaned.split(separator: ":").last,
-                  let port = Int(portStr) else { continue }
-
-            results.append(ListeningPort(
-                port: port,
-                pid: pid,
-                command: command,
-                protocolName: protoName
-            ))
+        for line in output.split(separator: "\n", omittingEmptySubsequences: true) {
+            guard let tag = line.first else { continue }
+            let rest = String(line.dropFirst())
+            switch tag {
+            case "p":
+                currentPid = Int32(rest) ?? 0
+                currentCommand = ""
+                currentProto = ""
+            case "c":
+                currentCommand = rest
+            case "P":
+                currentProto = rest
+            case "n":
+                let cleaned = rest
+                    .replacingOccurrences(of: "[", with: "")
+                    .replacingOccurrences(of: "]", with: "")
+                if let portStr = cleaned.split(separator: ":").last,
+                   let port = Int(portStr) {
+                    results.append(ListeningPort(
+                        port: port,
+                        pid: currentPid,
+                        command: currentCommand,
+                        protocolName: currentProto
+                    ))
+                }
+            default:
+                break
+            }
         }
 
         var seen = Set<String>()

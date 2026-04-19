@@ -4,17 +4,26 @@ import AppKit
 @main
 struct LocalhostHQApp: App {
     @StateObject private var scanner = PortScanner()
-
-    init() {
-        NSApp.setActivationPolicy(.accessory)
-    }
+    @StateObject private var prober = TitleProber()
+    @StateObject private var store = HiddenPatternsStore()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(scanner: scanner)
+            MenuBarView(scanner: scanner, prober: prober, store: store)
         } label: {
             Label("localhost-hq", systemImage: "network")
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView(store: store)
+        }
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
     }
 }
