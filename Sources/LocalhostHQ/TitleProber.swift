@@ -17,6 +17,8 @@ final class TitleProber: ObservableObject {
         return URLSession(configuration: config)
     }()
 
+    private let redirectBlocker = LoopbackOnlyRedirectBlocker()
+
     func title(for port: ListeningPort) -> String? {
         let key = cacheKey(port)
         guard let t = titles[key], !t.isEmpty else { return nil }
@@ -55,7 +57,7 @@ final class TitleProber: ObservableObject {
         req.setValue("text/html,*/*;q=0.8", forHTTPHeaderField: "Accept")
 
         do {
-            let (data, response) = try await session.data(for: req)
+            let (data, response) = try await session.data(for: req, delegate: redirectBlocker)
             if let http = response as? HTTPURLResponse,
                let ct = http.value(forHTTPHeaderField: "Content-Type")?.lowercased(),
                !ct.contains("html") && !ct.contains("xml") && !ct.contains("text") {
@@ -86,6 +88,22 @@ final class TitleProber: ObservableObject {
 
         guard !raw.isEmpty else { return nil }
         return decodeEntities(raw)
+    }
+
+    /// Refuses any redirect that leaves the loopback interface. Protects against a
+    /// rogue local server that 302s the probe to an attacker-controlled URL.
+    private final class LoopbackOnlyRedirectBlocker: NSObject, URLSessionTaskDelegate {
+        private static let allowedHosts: Set<String> = ["localhost", "127.0.0.1", "::1", "0.0.0.0"]
+
+        func urlSession(
+            _ session: URLSession,
+            task: URLSessionTask,
+            willPerformHTTPRedirection response: HTTPURLResponse,
+            newRequest request: URLRequest
+        ) async -> URLRequest? {
+            guard let host = request.url?.host?.lowercased() else { return nil }
+            return Self.allowedHosts.contains(host) ? request : nil
+        }
     }
 
     private func decodeEntities(_ s: String) -> String {

@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>localhost-hq — what's running on localhost</title>
+<meta name="description" content="A tiny macOS menu bar app that lists every dev server on your machine, with scraped page titles so you always know what's on :3000." />
+<meta property="og:title" content="localhost-hq" />
+<meta property="og:description" content="A tiny macOS menu bar app for juggling a dozen dev servers at once." />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://raw.githubusercontent.com/bradystroud/localhost-hq/main/docs/screenshot.png" />
+<meta property="og:url" content="https://bradystroud.github.io/localhost-hq/" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext x='50%25' y='58%25' text-anchor='middle' font-size='72'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #070809;
+    --bg-alt: #0f1013;
+    --bg-elevated: #14161a;
+    --text: #e6e8ec;
+    --muted: #8b8f98;
+    --muted-dim: #5a5e67;
+    --accent: #7aff5f;
+    --accent-hover: #92ff7a;
+    --accent-dim: rgba(122, 255, 95, 0.12);
+    --border: rgba(255, 255, 255, 0.07);
+    --border-strong: rgba(255, 255, 255, 0.15);
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(122, 255, 95, 0.08), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 20% 40%, rgba(96, 165, 250, 0.04), transparent 70%),
+      var(--bg);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  a { color: inherit; }
+
+  main {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 32px 24px 96px;
+  }
+
+  nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0 48px;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  nav .logo { color: var(--text); text-decoration: none; font-weight: 600; letter-spacing: -0.01em; }
+  nav .logo::before { content: '▸ '; color: var(--accent); }
+  nav a.ghlink {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: all 0.15s ease;
+  }
+  nav a.ghlink:hover { color: var(--text); border-color: var(--border-strong); }
+
+  .hero {
+    text-align: center;
+    padding: 40px 0 24px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    margin-bottom: 36px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .badge .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  h1 {
+    font-size: clamp(52px, 9vw, 104px);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    margin: 0 0 24px;
+    line-height: 0.95;
+    background: linear-gradient(180deg, #ffffff 0%, #a8acb4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  h1 .accent {
+    background: linear-gradient(180deg, var(--accent) 0%, #4bd631 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .lede {
+    font-size: clamp(18px, 2.2vw, 22px);
+    color: var(--muted);
+    max-width: 620px;
+    margin: 0 auto 40px;
+    line-height: 1.55;
+  }
+  .lede strong { color: var(--text); font-weight: 500; }
+
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 26px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 15px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.03);
+    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    cursor: pointer;
+  }
+  .btn:hover { transform: translateY(-1px); border-color: var(--border-strong); background: rgba(255, 255, 255, 0.06); }
+  .btn-primary {
+    background: var(--accent);
+    color: #001907;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #001907; }
+
+  .shot-wrap {
+    margin: 56px auto 0;
+    max-width: 580px;
+    position: relative;
+  }
+  .shot-wrap::before {
+    content: '';
+    position: absolute;
+    inset: -60px -20px -20px;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 40%, var(--accent-dim), transparent 70%);
+    z-index: 0;
+    pointer-events: none;
+    filter: blur(30px);
+  }
+  .shot-wrap img {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: auto;
+    border-radius: 16px;
+    box-shadow:
+      0 40px 100px rgba(0, 0, 0, 0.6),
+      0 0 0 1px var(--border-strong);
+  }
+
+  .section {
+    padding: 96px 0 0;
+  }
+
+  .section-tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+  }
+
+  h2 {
+    font-size: clamp(30px, 4vw, 44px);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 0 0 20px;
+    line-height: 1.1;
+  }
+
+  .why {
+    max-width: 760px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .why p {
+    font-size: 18px;
+    color: var(--muted);
+    line-height: 1.65;
+    margin: 0;
+  }
+
+  .features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 40px;
+  }
+  .card {
+    background: linear-gradient(180deg, var(--bg-alt), rgba(15, 16, 19, 0.6));
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .card:hover {
+    border-color: rgba(122, 255, 95, 0.25);
+    transform: translateY(-2px);
+    background: linear-gradient(180deg, #151719, rgba(20, 22, 26, 0.7));
+  }
+  .card:hover::before { opacity: 1; }
+  .card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: var(--accent);
+    font-family: var(--mono);
+    letter-spacing: -0.01em;
+  }
+  .card p {
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+  .card code {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: rgba(122, 255, 95, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--accent);
+  }
+  .card strong { color: var(--text); font-weight: 500; }
+
+  .install-section {
+    margin-top: 96px;
+    padding: 40px;
+    background: linear-gradient(180deg, var(--bg-alt), var(--bg));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    position: relative;
+  }
+  .install-section h2 { margin-bottom: 8px; }
+  .install-section > p {
+    color: var(--muted);
+    margin: 0 0 24px;
+    font-size: 15px;
+  }
+  .code-block {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.7;
+    overflow-x: auto;
+    position: relative;
+  }
+  .code-block code { color: var(--text); }
+  .code-block .prompt { color: var(--muted-dim); user-select: none; }
+  .code-block .cmd { color: var(--accent); }
+  .copy-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .copy-btn:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); border-color: var(--border-strong); }
+  .copy-btn.copied { color: var(--accent); border-color: var(--accent); }
+
+  footer {
+    margin-top: 80px;
+    padding-top: 36px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    font-family: var(--mono);
+  }
+  footer a {
+    color: var(--text);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--muted-dim);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  footer a:hover { color: var(--accent); border-color: var(--accent); }
+
+  @media (max-width: 640px) {
+    nav { padding-top: 8px; padding-bottom: 32px; }
+    .hero { padding: 16px 0; }
+    h1 { letter-spacing: -0.03em; }
+    .install-section { padding: 28px 20px; }
+    .section { padding-top: 64px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <nav>
+    <a href="#" class="logo">localhost-hq</a>
+    <a href="https://github.com/bradystroud/localhost-hq" class="ghlink">github ↗</a>
+  </nav>
+
+  <section class="hero">
+    <div class="badge">
+      <span class="dot"></span>
+      macOS menu bar · open source · SwiftUI
+    </div>
+    <h1>know what's on<br /><span class="accent">:3000</span></h1>
+    <p class="lede">
+      A tiny macOS menu bar app that tells you which dev server is on which port.
+      <strong>Scrapes the page title.</strong> Warns on conflicts. Kills what you don't need.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#install">Get it</a>
+      <a class="btn" href="https://github.com/bradystroud/localhost-hq">Source</a>
+    </div>
+
+    <div class="shot-wrap">
+      <img src="screenshot.png" alt="localhost-hq menu bar app showing ports 3000, 3001, 5000, 5101, 5102, 7000 with process names and scraped page titles" />
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="why">
+      <div class="section-tag">why</div>
+      <h2>Juggling a dozen local dev servers is the new normal.</h2>
+      <p>
+        Which app is on 3000 right now? Is 5432 still taken by the Postgres container from last week?
+        What is this random port Rider keeps opening? <strong style="color:var(--text)">localhost-hq</strong>
+        answers all of it at a glance, from your menu bar, without a single <code style="font-family:var(--mono);background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;color:var(--accent)">lsof</code> invocation on your part.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-tag" style="text-align:center">features</div>
+    <h2 style="text-align:center">Every dev server, one menu bar click away.</h2>
+    <div class="features">
+      <div class="card">
+        <h3>live port list</h3>
+        <p>Every TCP listener, refreshed every 3 seconds. Port, command, pid — all visible without running <code>lsof</code> yourself.</p>
+      </div>
+      <div class="card">
+        <h3>page title scrape</h3>
+        <p>Each port gets a quick <code>GET /</code>. If it's serving HTML, the page <code>&lt;title&gt;</code> shows up next to the port — so you read <strong>AutoQuizzer</strong>, not just <strong>node</strong>.</p>
+      </div>
+      <div class="card">
+        <h3>smart noise filter</h3>
+        <p>Hides IDEs, Adobe, Orbstack, Slack, browser helpers, macOS daemons. But keeps anything actually serving HTTP — so a dev server running inside Rider doesn't disappear.</p>
+      </div>
+      <div class="card">
+        <h3>conflict warnings</h3>
+        <p>Two processes on the same port? They get flagged in orange. No more "why isn't this working" staring at the terminal.</p>
+      </div>
+      <div class="card">
+        <h3>kill from the menu</h3>
+        <p>Point at the rogue process, click, confirm. <code>TERM</code> or <code>KILL</code> — your call.</p>
+      </div>
+      <div class="card">
+        <h3>is port N free?</h3>
+        <p>Type a port number, get the answer instantly. Tells you what's on it too, so you can go shut that down.</p>
+      </div>
+      <div class="card">
+        <h3>one-click hide</h3>
+        <p>An eye-slash button on every row. See something noisy? Click once, it's gone from future lists.</p>
+      </div>
+      <div class="card">
+        <h3>open in browser</h3>
+        <p>Anything with a scraped title gets a one-click opener. Straight from the menu bar to your running app.</p>
+      </div>
+      <div class="card">
+        <h3>zero dependencies</h3>
+        <p>No sudo, no entitlements, no third-party frameworks. One Swift Package, builds with <code>swift run</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section install-section" id="install">
+    <div class="section-tag">install</div>
+    <h2>Run it in two commands.</h2>
+    <p>Requires macOS 14+ and Xcode command line tools.</p>
+    <pre class="code-block" id="code"><button class="copy-btn" id="copy">copy</button><code><span class="prompt">$ </span><span class="cmd">git clone https://github.com/bradystroud/localhost-hq</span>
+<span class="prompt">$ </span><span class="cmd">cd localhost-hq</span>
+<span class="prompt">$ </span><span class="cmd">swift run</span></code></pre>
+  </section>
+
+  <footer>
+    <p>Built by <a href="https://github.com/bradystroud">@bradystroud</a> · MIT licensed · <a href="https://github.com/bradystroud/localhost-hq">source on github</a></p>
+  </footer>
+</main>
+
+<script>
+  const btn = document.getElementById('copy');
+  btn.addEventListener('click', async () => {
+    const text = 'git clone https://github.com/bradystroud/localhost-hq\ncd localhost-hq\nswift run';
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'copied';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'copy';
+        btn.classList.remove('copied');
+      }, 1400);
+    } catch (err) {
+      btn.textContent = 'failed';
+    }
+  });
+</script>
+</body>
+</html>
